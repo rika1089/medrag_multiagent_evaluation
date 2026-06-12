@@ -1,275 +1,134 @@
 # MedRAG Multi‑Agent Evaluation
 
-> A multi‑agent Retrieval‑Augmented Generation (RAG) evaluation framework for medical question answering and clinical reasoning.
+A multi‑agent Retrieval‑Augmented Generation (RAG) framework for evaluating medical QA systems with answer, critique, and evaluation agents.  
+This project provides an end‑to‑end pipeline from question submission to automatic scoring of LLM‑based medical assistants.
 
----
+## Features
 
-## 🔍 Overview
+- Multi‑agent architecture with **Answer**, **Critique**, and **Evaluation** agents for medical QA.
+- Pluggable RAG stack: swap retrievers, vector stores, and LLM backends without changing the evaluation logic.
+- Evaluation metrics for faithfulness, relevance, completeness, and safety, optimized for medical use‑cases.
+- Dashboard for visualizing per‑question traces (retrieval → answer → critique → scores).
 
-MedRAG Multi‑Agent Evaluation is a **full‑stack** application (frontend + backend) that orchestrates multiple LLM‑based agents to evaluate responses for medical tasks such as diagnosis support, summarization, and knowledge QA.  
-It is designed to be easily deployable (e.g. via Render) and extensible for new tasks and models.
+## System Architecture
 
----
-
-## ✨ Key Features
-
-- Multi‑agent evaluation pipeline for medical RAG.
-- Modular **backend** for agents, tools, and scoring.
-- Interactive **frontend** for running and visualizing evaluations.
-- Config‑driven deployment (via `render.yaml`).
-- Easily extendable to new datasets and model providers.
-
----
-
-## 🧠 Conceptual Flyover
-
-The idea of this project:
-
-1. A user or benchmark provides a clinical question or case.
-2. A retrieval module fetches relevant medical evidence (guidelines, literature, notes).
-3. One or more LLM agents generate and critique responses.
-4. An evaluation agent scores responses on dimensions like correctness, safety, and reasoning quality.
-5. The frontend visualizes results and comparisons.
-
-You can think of it as a “panel of AI clinicians” that both answer and **evaluate**.
-
----
-
-## 📊 System Architecture (Infograph‑Style)
+The system follows a client–server design with a dedicated data & models layer.
 
 ```mermaid
 flowchart LR
-  subgraph Client[Frontend (UI)]
-    U[User]
-    UI[Evaluation Dashboard]
+  %% ==== Client ====
+  subgraph Client["Frontend (UI)"]
+    U["User"]
+    UI["Evaluation Dashboard"]
   end
 
-  subgraph Server[Backend API]
-    G[Gateway / REST API]
-    R[Retriever]
-    A1[Answer Agent]
-    A2[Critique Agent]
-    E[Evaluation Agent]
+  %% ==== Server ====
+  subgraph Server["Backend API"]
+    G["Gateway / REST API"]
+    R["Retriever"]
+    A1["Answer Agent"]
+    A2["Critique Agent"]
+    E["Evaluation Agent"]
   end
 
-  subgraph Data[Data & Models]
-    D[(Medical Corpus)]
-    M[(LLM / RAG Models)]
+  %% ==== Data & Models ====
+  subgraph Data["Data & Models"]
+    D["Medical Corpus"]
+    M["LLM / RAG Models"]
   end
 
+  %% Client ↔ Server
   U --> UI
   UI --> G
 
+  %% Retrieval + Answering
   G --> R
   R --> D
   R --> A1
 
+  %% Agents collaboration
   A1 --> A2
   A1 --> E
   A2 --> E
 
+  %% Evaluation back to UI
   E --> G
   G --> UI
 
+  %% Model connections
   A1 --- M
   A2 --- M
   E  --- M
 ```
 
----
+### Components
 
-## 🔁 Evaluation Flow Chart
+- **Frontend (UI)**  
+  Evaluation dashboard for entering medical questions and inspecting retrieved evidence, answers, critiques, and metrics. Can be implemented in Streamlit, Gradio, or any SPA calling the REST API.
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Frontend
-    participant API
-    participant Retriever
-    participant Agents
-    participant Evaluator
+- **Gateway / REST API**  
+  Single entrypoint (e.g., FastAPI) exposing `/ask`, `/evaluate`, and `/batch_evaluate` endpoints. Orchestrates calls between retriever, agents, and evaluation logic.
 
-    User->>Frontend: Input question / case
-    Frontend->>API: POST /evaluate
-    API->>Retriever: fetch_evidence(query)
-    Retriever-->>API: relevant_documents
-    API->>Agents: generate_answer(evidence)
-    Agents-->>API: candidate_answer(s)
-    API->>Evaluator: score_answers(answers, evidence)
-    Evaluator-->>API: structured_scores + feedback
-    API-->>Frontend: results JSON
-    Frontend-->>User: show answers, scores, reasoning
-```
+- **Retriever**  
+  Embedding‑based or BM25 retrieval over a curated medical corpus (guidelines, PubMed abstracts, MedRAG/MIRAGE datasets). Returns the top‑k passages used by the answer and critique agents.
 
----
+- **Answer Agent**  
+  LLM‑powered agent that generates grounded answers using retrieved context. Supports multiple backends (OpenAI, local models, MedRAG pipelines) via a common interface.
 
-## 🧩 Repository Structure
+- **Critique Agent**  
+  Secondary LLM agent that reviews the answer (and context) for hallucinations, missing evidence, unsafe advice, and guideline violations. Produces structured feedback used by the evaluation agent and shown in the UI.
 
-```text
-medrag_multiagent_evaluation/
-├── backend/           # Backend application (APIs, agents, retrieval, evaluation)
-├── frontend/          # Frontend UI (dashboard, visualizations)
-├── .gitignore         # Git ignores for the project
-├── render.yaml        # Render deployment config
-├── requirements.txt   # Python dependencies for backend / services
-└── runtime.txt        # Runtime / Python version hints for hosting
-```
+- **Evaluation Agent**  
+  Converts outputs into structured metrics: faithfulness, relevance, completeness, harmfulness, and overall score. Designed to support rubric‑based and LLM‑as‑a‑judge evaluation strategies.
 
----
+- **Data & Models**  
+  - *Medical Corpus*: versioned datasets and knowledge bases optimized for medical QA.  
+  - *LLM / RAG Models*: one or more models wrapped behind a common interface so agents can switch models for A/B experiments.
 
-## 🚀 Getting Started
+## Quick Start
 
-### 1. Clone the repository
+1. **Clone the repository**
 
-```bash
-git clone https://github.com/rika1089/medrag_multiagent_evaluation.git
-cd medrag_multiagent_evaluation
-```
+   ```bash
+   git clone https://github.com/<your-org>/medrag_multiagent_evaluation.git
+   cd medrag_multiagent_evaluation
+   ```
 
-### 2. Backend setup
+2. **Install dependencies**
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate   # On Windows: .venv\Scripts\activate
-pip install -r ../requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-Then run the backend (adjust if you use FastAPI, Flask, etc.):
+3. **Configure models and data**
 
-```bash
-# Example (replace with your actual command)
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
+   - Set your LLM and embedding keys in `.env` (e.g., `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`).
+   - Point `config/corpus.yaml` to your medical corpus or MedRAG‑style datasets.
 
-### 3. Frontend setup
+4. **Run the backend**
 
-```bash
-cd ../frontend
-# Example for React/Vite – update to your stack
-npm install
-npm run dev
-```
+   ```bash
+   uvicorn app.main:app --reload
+   ```
 
-Open the URL printed by your dev server (for example `http://localhost:5173`) to access the UI.
+5. **Launch the dashboard**
 
----
+   ```bash
+   streamlit run ui/app.py
+   ```
 
-## ☁️ Deployment (Render / similar)
+   The dashboard will connect to the backend API and render the full multi‑agent trace for each query.
 
-This repository includes a `render.yaml` which describes how to deploy the backend (and optionally the frontend) as web services.
+## Evaluation Workflow
 
-Typical flow:
+- **Single question mode**  
+  User submits a question from the UI. The system runs retrieval → answer agent → critique agent → evaluation agent. The UI displays answer, evidence, critique text, and metric scores for manual inspection.
 
-1. Push your code to GitHub.
-2. Connect the repo to Render.
-3. Render reads `render.yaml` and creates services.
-4. Configure environment variables (API keys, model endpoints, etc.).
-5. Trigger a deploy.
+- **Batch evaluation mode**  
+  Run a CLI over a dataset of medical QA pairs. Metrics are stored in `results/*.jsonl` and aggregated into summary tables and plots.
 
-Once deployed, update the frontend to use the deployed backend URL.
+## Roadmap
 
----
-
-## 🧪 How to Run an Evaluation
-
-A typical evaluation run:
-
-1. Open the frontend dashboard.
-2. Choose:
-   - Model(s) or agent configuration.
-   - Dataset or single custom query.
-3. Start the run and monitor progress.
-4. Review:
-   - Answer text.
-   - Evidence snippets used.
-   - Scores for correctness, safety, and reasoning.
-   - Explanations from evaluation agents.
-5. Export results (CSV/JSON) if supported by the UI.
-
----
-
-## 🧱 Extending the Framework
-
-You can extend the project in several directions:
-
-- Add new agent roles (e.g., **safety reviewer**, **simplifier**, **guideline checker**).
-- Plug in alternative retrievers or vector databases.
-- Register additional evaluation metrics (calibration, hallucination rate, etc.).
-- Integrate new LLM providers via API adapters.
-
-A common pattern is to implement a new agent class in the backend and then expose a configuration option in the frontend.
-
----
-
-## 🎨 “Moving Text” & Visual Enhancements
-
-GitHub does not support arbitrary CSS animations in `README.md`, but you can still make it attractive:
-
-- Use badges:
-
-  ```markdown
-  ![Status](https://img.shields.io/badge/status-experimental-orange)
-  ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-  ```
-
-- Use animated GIFs for demos:
-
-  ```markdown
-  ## Live Demo Preview
-
-  *Coming soon: short GIF demo of the evaluation dashboard in action.*
-
-  <!-- When ready, replace with an actual GIF stored in the repo:
-  ![Demo](./docs/demo.gif)
-  -->
-  ```
-
-- Use collapsible sections:
-
-  ```markdown
-  <details>
-  <summary>Click to expand advanced configuration</summary>
-
-  - Custom prompt templates
-  - Model routing strategies
-  - Fine‑grained scoring rubrics
-
-  </details>
-  ```
-
-These tricks create a sense of “motion” and interactivity without custom CSS.
-
----
-
-## 🧾 Requirements
-
-See [`requirements.txt`](./requirements.txt) and [`runtime.txt`](./runtime.txt) for the exact Python packages and runtime used.  
-Front‑end dependencies are managed via the package manager used under `frontend/` (for example, `npm` or `yarn`).
-
----
-
-## 🛡️ Disclaimer
-
-This project is for **research and evaluation** purposes in the medical domain.  
-It is **not** a substitute for professional medical advice, diagnosis, or treatment.  
-Outputs must always be reviewed and validated by qualified clinicians before use in any real‑world setting.
-
----
-
-## 📜 License
-
-Add your chosen license here (for example MIT, Apache‑2.0, etc.).
-
-```text
-Example:
-This project is licensed under the MIT License – see the LICENSE file for details.
-```
-
----
-
-## 👤 Author
-
-- **Rika** – [@rika1089](https://github.com/rika1089)
-
-Contributions, suggestions, and issue reports are welcome!
+- Add support for more medical benchmarks and evaluation rubrics.  
+- Integrate external evaluators (e.g., DeepEval / Vertex AI eval) as alternative backends for the evaluation agent.  
+- Provide ready‑to‑use configs for popular multi‑agent frameworks (LangGraph, AutoGen, CrewAI, Swarm).
