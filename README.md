@@ -39,41 +39,41 @@ You can think of it as a “panel of AI clinicians” that both answer and **eva
 
 ```mermaid
 flowchart LR
-    subgraph Client[Frontend (UI)]
-        U[User]
-        UI[Evaluation Dashboard]
-    end
+  subgraph Client[Frontend (UI)]
+    U[User]
+    UI[Evaluation Dashboard]
+  end
 
-    subgraph Server[Backend API]
-        G[Gateway / REST API]
-        R[Retriever]
-        A1[Answer Agent]
-        A2[Critique Agent]
-        E[Evaluation Agent]
-    end
+  subgraph Server[Backend API]
+    G[Gateway / REST API]
+    R[Retriever]
+    A1[Answer Agent]
+    A2[Critique Agent]
+    E[Evaluation Agent]
+  end
 
-    subgraph Data[Data & Models]
-        D[(Medical Corpus)]
-        M[(LLM / RAG Models)]
-    end
+  subgraph Data[Data & Models]
+    D[(Medical Corpus)]
+    M[(LLM / RAG Models)]
+  end
 
-    U --> UI
-    UI --> G
+  U --> UI
+  UI --> G
 
-    G --> R
-    R --> D
+  G --> R
+  R --> D
+  R --> A1
 
-    R --> A1
-    A1 --> A2
-    A1 --> E
-    A2 --> E
+  A1 --> A2
+  A1 --> E
+  A2 --> E
 
-    G <-- E
-    UI <-- G
+  E --> G
+  G --> UI
 
-    A1 --- M
-    A2 --- M
-    E --- M
+  A1 --- M
+  A2 --- M
+  E  --- M
 ```
 
 ---
